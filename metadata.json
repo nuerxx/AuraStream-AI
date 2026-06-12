@@ -1,0 +1,6 @@
+{
+  "name": "أوراستريم AI - AuraStream AI",
+  "description": "منصة ذكية ذات دقة فائقة لتنزيل الفيديوهات بجودات متعددة ومعالجتها بالذكاء الاصطناعي Gemini AI لمختلف المنصات.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
