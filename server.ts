@@ -80,6 +80,8 @@ interface VideoMetadata {
     url: string;
     type: "video" | "audio";
   }>;
+  category?: string;
+  suggested_pipeline?: string;
 }
 
 function extractMetadata(url: string): VideoMetadata {
@@ -410,7 +412,9 @@ ${scrapedContent}
     { "quality": "1080p Ultra HD", "resolution": "1920x1080", "size": "78.4 MB", "fps": 60, "url": "${url}", "type": "video" },
     { "quality": "720p HD Ready", "resolution": "1280x720", "size": "38.2 MB", "fps": 30, "url": "${url}", "type": "video" },
     { "quality": "Audio Only High-Quality (MP3)", "resolution": "320kbps", "size": "6.4 MB", "fps": 0, "url": "${url}", "type": "audio" }
-  ]
+  ],
+  "category": "تحديد تصنيف الفيديو بالإنجليزية حصراً وتكون واحدة من: (match_highlight أو tactical_analysis أو training_drill أو news_flash)",
+  "suggested_pipeline": "مسار المونتاج والعملية المقترحة باللغة العربية حسب نوع الميديا"
 }
 
 ابحث عن الكلمات المفتاحية المتعلقة بالملخص، والتفاصيل، وأنشئ الكائن بدقة عالية ليمرره النظام كفيديو مسحوب بنجاح!`;
@@ -521,6 +525,20 @@ app.post("/api/scheduler/run-now", async (req, res) => {
 
     // Simulate returning a fresh video match metadata!
     const randomId = Math.random().toString(36).substring(2, 10);
+    const categoriesList = ["match_highlight", "tactical_analysis", "training_drill", "news_flash"];
+    const chosenCategory = categoriesList[Math.floor(Math.random() * categoriesList.length)];
+    
+    let simulatedPipeline = "كشط مقطع ونقله لمصنع الشورتس لتحسين التفاعل الذكي";
+    if (chosenCategory === "match_highlight") {
+      simulatedPipeline = "تحليل اللقطة لإنشاء تعليق كروي باللغة العربية مع تفعيل التعليق الصوتي وصنع مقاطع شورتس فيروسية فوراً.";
+    } else if (chosenCategory === "tactical_analysis") {
+      simulatedPipeline = "اكتشاف تكتيكات اللعب، إعداد سيناريو تحليل معقد للشرح وتجزيئ اللقطات لإنتاج فيديوهات تفاعلية طويلة.";
+    } else if (chosenCategory === "training_drill") {
+      simulatedPipeline = "توليد نص تدريب حماسي، إضافة تعليق صوتي منسق، ودمج مقاطع الشورتس الرياضية لجذب الرياضيين وصناع محتوى اللياقة.";
+    } else if (chosenCategory === "news_flash") {
+      simulatedPipeline = "تصدير فوري لوسوم السيو SEO، صياغة أخبار المونديال العاجلة، وجدولتها في تقويم المحتوى لاستقطاب الجماهير.";
+    }
+
     const simulatedMetaObj: VideoMetadata = {
       id: randomId,
       title: randomTitle,
@@ -535,7 +553,9 @@ app.post("/api/scheduler/run-now", async (req, res) => {
         { quality: "1080p Ultra HD", resolution: "1920x1080", size: "82.4 MB", fps: 60, url: chosenUrl, type: "video" },
         { quality: "720p HD Ready", resolution: "1280x720", size: "41.6 MB", fps: 30, url: chosenUrl, type: "video" },
         { quality: "Audio Only High-Quality (MP3)", resolution: "320kbps", size: "8.2 MB", fps: 0, url: chosenUrl, type: "audio" }
-      ]
+      ],
+      category: chosenCategory,
+      suggested_pipeline: simulatedPipeline
     };
 
     res.json({

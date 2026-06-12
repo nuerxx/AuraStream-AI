@@ -74,11 +74,19 @@ interface VideoMetadata {
   likes: string;
   url: string;
   formats: VideoFormat[];
+  category?: string;
+  suggested_pipeline?: string;
 }
 
 export default function App() {
   const [lang, setLang] = useState<"ar" | "en">("ar");
   const [activeView, setActiveView] = useState<string>("downloader");
+  const [activeHub, setActiveHub] = useState<"all" | "harvesting" | "editor" | "publishing">("all");
+
+  // Autopilot states
+  const [autopilotMode, setAutopilotMode] = useState<boolean>(true);
+  const [automationStep, setAutomationStep] = useState<number>(-1); 
+  const [autopilotLog, setAutopilotLog] = useState<string[]>([]);
 
   // Telemetry metrics
   const [videosCount, setVideosCount] = useState(47);
@@ -284,6 +292,9 @@ export default function App() {
         }
         showToast(lang === "ar" ? `✓ نجح الكشط! تم كشف وتنسيق فيديو: ${data.metadata.title}` : `✓ Scrape success! Mapped: ${data.metadata.title}`);
         setActiveView("downloader");
+        if (autopilotMode) {
+          executeContinuousPipeline(data.metadata);
+        }
       } else {
         showToast(data.error || (lang === "ar" ? "🛑 فشل محرك الكشط" : "🛑 Scraper failed"));
       }
@@ -365,20 +376,20 @@ export default function App() {
     { agent: "Voice", agentAr: "المعلق المحترف", task: "Idle — ready for script", taskAr: "جاهز لتسجيل التعليق الصوتي فورا", time: "—", status: "queued" },
   ];
 
-  const matchDays: { [key: string]: string } = {
+  const [matchDays, setMatchDays] = useState<{ [key: string]: string }>({
     "2026-06-11": "Mexico vs South Africa | المكسيك ضد جنوب أفريقيا",
     "2026-06-12": "Group A Matches | مواجهات المجموعة أ",
     "2026-06-14": "Group C Matches | مواجهات المجموعة ج",
     "2026-06-16": "France vs Senegal | القمة: فرنسا ضد السنغال",
     "2026-07-19": "🏆 World Cup Grand Final | النهائي التاريخي للمونديال"
-  };
+  });
 
-  const videoDays: { [key: string]: string } = {
+  const [videoDays, setVideoDays] = useState<{ [key: string]: string }>({
     "2026-06-10": "PREVIEW: Great Kickoff",
     "2026-06-11": "LONG: Opening Day Analysis",
     "2026-06-14": "LONG: Group of Death Tactics",
     "2026-07-19": "LONG: Winner Celebration Document"
-  };
+  });
 
   // Examples prefilled
   const examples = [
@@ -387,38 +398,165 @@ export default function App() {
     { name: "Instagram Real Footage", url: "https://www.instagram.com/p/training_stars_session/" },
   ];
 
-  // Pipeline simulation
-  const runFullAutomation = () => {
-    const steps = lang === "ar" ? [
-      "🕵️ رصد المحتوى: تم كشف 12 فكرة فيروسية مرشحة لمونديال 2026...",
-      "✍️ كاتب النصوص: توليد 12 سيناريو تكتيكي دقيق لرفع نسبة الاحتفاظ بالمشاهد...",
-      "🎞️ المونتاج: تم تخطيط هيكل اللقطات والروابط المباشرة تلقائياً...",
-      "🎙️ معالج دبلجة التعليق: بناء تضخيم النبرة والتعليق بحماس فائق...",
-      "📤 الناشر الزمني: جدولة 60 مقطعاً قصيراً ورفع دقة التصدير لبطاقة المونديال!",
-      "✅ تم اكتمال تدفق العمل المتكامل! الفيديوهات جاهزة بلمسة بيكسل متناهية."
-    ] : [
-      "🕵️ Watcher: 12 potential viral World Cup 2026 ideas discovered...",
-      "✍️ Copywriter: Generated high-retention script formats using Gemini AI...",
-      "🎞️ Editor: Rendered cinematic shot plans automatically...",
-      "🎙️ Voice Pro: Created audio commentary pacing curves...",
-      "📤 Publisher: All 60 video short variations successfully scheduled!",
-      "✅ Pipeline execution completed with extreme visual precision!"
-    ];
+  // Robotic continuous automation pipeline manager
+  const executeContinuousPipeline = async (meta: VideoMetadata) => {
+    setAutomationStep(0);
+    setAutopilotLog([lang === "ar" ? "📥 تم استلام الفيديو وتخزين الأبعاد الوصفية..." : "📥 Media received and metadata indexed."]);
+    
+    // Step 1: Summary
+    await new Promise(resolve => setTimeout(resolve, 800));
+    setAutomationStep(1);
+    setAutopilotLog(prev => [...prev, lang === "ar" ? "ℹ️ جاري صياغة تحليل ملخص تكتيكي من Gemini..." : "ℹ️ Summarizing and classifying content target via Gemini..."]);
+    try {
+      const resp = await fetch("/api/ai/summarize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: meta.title,
+          platform: meta.platform,
+          duration: meta.duration,
+          author: meta.author
+        }),
+      });
+      const data = await resp.json();
+      setSummaryResult(data.result);
+      setAutopilotLog(prev => [...prev, lang === "ar" ? "✓ تم بناء ملخص الميديا وكشف الثغرة الفيروسية بنجاح." : "✓ High-fidelity video summary compiled successfully!"]);
+    } catch (err) {
+      setSummaryResult(lang === "ar" ? "ملخص مدمج لسيناريو كأس العالم" : "Fallback summary created.");
+    }
 
-    let i = 0;
-    showToast(steps[0]);
-    const interval = setInterval(() => {
-      i++;
-      if (i < steps.length) {
-        showToast(steps[i]);
-      } else {
-        clearInterval(interval);
-        setVideosCount((prev) => prev + 12);
-        setViewsCount((prev) => prev + 540000);
-        setRevenueCount((prev) => prev + 4120);
-        setSubsCount((prev) => prev + 1950);
-      }
-    }, 1500);
+    // Step 2: Scriptwriting
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    setAutomationStep(2);
+    setAutopilotLog(prev => [...prev, lang === "ar" ? "✍️ جاري صياغة السناريو الذكي وحفظ الأجزاء المرتفعة الاحتفاظ..." : "✍️ Formulating retention-focused football script..."]);
+    try {
+      const resp = await fetch("/api/ai/script", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: meta.title,
+          style: scriptStyle,
+          language: scriptLanguage
+        }),
+      });
+      const data = await resp.json();
+      setScriptResult(data.result);
+      setAutopilotLog(prev => [...prev, lang === "ar" ? "✓ تم تحصيل النص بالكامل ونقله لخط المونتاج." : "✓ Retention-focused script compiled!"]);
+    } catch (err) {
+      setScriptResult("Script compiled.");
+    }
+
+    // Step 3: Shotlist
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    setAutomationStep(3);
+    setAutopilotLog(prev => [...prev, lang === "ar" ? "🎞️ جاري تصميم المشاهد واللقطات وكاميرات المخرج..." : "🎞️ Modeling cinema cutpoints and shot list presets..."]);
+    const isAr = lang === "ar";
+    const shotlistMock = isAr ? `🎬 جدول قائمة اللقطات المونتاجية لمشهد: "${meta.title}":
+• [لقطة 1] مشهد ثلاثي الأبعاد لردة فعل الجمهور مع صعود مستوى ديسيبل الصوت (3 ثوانٍ)
+• [لقطة 2] زووم حاد ومقرب لخط التسلل ورسم بياني تكتيكي مشع (4 ثوانٍ)
+• [لقطة 3] هجمة هالاند المرتدة بـ 60 إطار بالثانية فائقة الدقة (3 ثوانٍ)`
+: `🎬 Interactive Movie Shot List - ${meta.title}:
+• [Shot 1] Ultra-wide 3D Stadium zoom-in with sound build-up (3s)
+• [Shot 2] Dynamic vector board markup illustrating defense alignment (4s)
+• [Shot 3] Majestic footage rendering with pixel optimization (3s)`;
+    setEditorResult(shotlistMock);
+    setAutopilotLog(prev => [...prev, lang === "ar" ? "✓ تم إخراج اللقطات وهيكلتها بقالب المونتاج." : "✓ Cut points and editing layers locked!"]);
+
+    // Step 4: Voice Over Commentary
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    setAutomationStep(4);
+    setAutopilotLog(prev => [...prev, lang === "ar" ? "🎙️ جاري تضخيم ترددات المعلق وإنشاء نغمة الانفعال الكروي..." : "🎙️ Tuning acoustic commentators profile & emotions..."]);
+    const voiceMock = isAr ? `🎙️ المعنى والمخطط الصوتي:
+• نبرة آدم العميقة (Deep Authoritative Voice) مفعلة لزيادة البقاء.
+• تصاعد التردد -12dB لدمج الموسيقى الأوركسترالية الحماسية تحت النطق.`
+: `🎙️ Voice Modulation Profile:
+• Professional Adam profile activated for supreme audience duration.
+• Orchestra score layered at -12dB to secure copyright bypass.`;
+    setVoiceResult(voiceMock);
+    setAutopilotLog(prev => [...prev, lang === "ar" ? "✓ تم صياغة النبرات وبناء خط التعليق بنجاح." : "✓ Commentary pacing matrix created!"]);
+
+    // Step 5: Clips Slicer
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    setAutomationStep(5);
+    setAutopilotLog(prev => [...prev, lang === "ar" ? "⚡ جاري تقسیم وتقطيع المقاطع القصيرة (Micro-Shorts)..." : "⚡ Slicing media loop into 5 viral short segments..."]);
+    const shortsMock = isAr ? `⚡ خطة مصنع الفيديوهات القصيرة (Shorts Plan):
+1. مقطع "الزلزال التكتيكي الفيروسي" - خطاف 1.5 ثانية
+2. مقطع "سر الملعب المغلق في مونديال 2026" - نقاش كروي
+3. مقطع "البطل المتوقع طبقا للأحداث"`
+: `⚡ Viral Clip Slices:
+1. "The ultimate tactical loop" | Hook 1.5s
+2. "Unexplored stadium zone secrets revealed" | Pacing high
+3. "Prediction engine winner projection loop"`;
+    setShortsResult(shortsMock);
+    setAutopilotLog(prev => [...prev, lang === "ar" ? "✓ تم إنشاء خطة المقاطع وتطبيق قوالب الهوية البراند." : "✓ Shorts slice plan generated!"]);
+
+    // Step 6: SEO Tags & Titles
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    setAutomationStep(6);
+    setAutopilotLog(prev => [...prev, lang === "ar" ? "📈 جاري جلب وسوم سيو وعناوين نقر عالية الجودة من Gemini..." : "📈 Querying SEO metadata and viral keywords via Gemini..."]);
+    try {
+      const resp = await fetch("/api/ai/seo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: meta.title,
+          keyword: meta.title
+        }),
+      });
+      const data = await resp.json();
+      setSeoResult(data.result);
+      setAutopilotLog(prev => [...prev, lang === "ar" ? "✓ تم بناء حزمة الأكواد ووسوم السيو بنجاح." : "✓ SEO metadata successfully synthesized!"]);
+    } catch {
+      setSeoResult("SEO tags compiled.");
+    }
+
+    // Step 7: Calendar Scheduling
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    setAutomationStep(7);
+    setAutopilotLog(prev => [...prev, lang === "ar" ? "📅 جاري حجز موعد نشر آلي في تقويم المحتوى..." : "📅 Reserving peak hours calendar lot for publishing..."]);
+    const dayToSchedule = "2026-06-15";
+    setVideoDays(prev => ({
+      ...prev,
+      [dayToSchedule]: (lang === "ar" ? "تصدير آلي: " : "AUTO: ") + meta.title
+    }));
+    setAutopilotLog(prev => [...prev, lang === "ar" ? `✓ وضع النشر الذكي محجوز ومؤمن باليوم ${dayToSchedule} الساعة 18:00.` : `✓ Booked successfully on ${dayToSchedule} at peak hour.`]);
+
+    // Step 8: Done!
+    await new Promise(resolve => setTimeout(resolve, 1200));
+    setAutomationStep(8);
+    setAutopilotLog(prev => [...prev, lang === "ar" ? "🎉 رائع! تم إكمال مسار المونتاج والجدولة والنشر للكل بدون تدخل بشري!" : "🎉 Complete autonomous cascade concluded in high-fidelity!"]);
+    
+    // Increment Stats to reward the user visually!
+    setVideosCount(prev => prev + 1);
+    setViewsCount(prev => prev + 98000);
+    setRevenueCount(prev => prev + 480);
+    setSubsCount(prev => prev + 175);
+    
+    showToast(isAr ? "🎉 اكتمل الممر المؤتمت الشامل!" : "🎉 Autonomous pipeline runs concluded!");
+  };
+
+  // Pipeline simulation via the top bar button
+  const runFullAutomation = () => {
+    const targetMeta: VideoMetadata = videoMeta || {
+      id: "simulated_master_video",
+      title: lang === "ar" ? "المفاجأة التكتيكية ومجموعة الموت في مونديال 2026" : "Tactical trends and Group of Death in WC26",
+      duration: "08:45",
+      author: "قناة إمبراطورية الكرة (Tactical Empire)",
+      platform: "YouTube",
+      thumbnail: "https://images.unsplash.com/photo-1540747737956-378724044453?w=800&auto=format&fit=crop&q=60",
+      views: "1.2M",
+      likes: "148K",
+      url: "https://youtube.com/watch?v=soccer_insights",
+      formats: [
+        { quality: "1080p Ultra HD", resolution: "1920x1080", size: "86M", fps: 60, url: "youtube", type: "video" }
+      ]
+    };
+    
+    if (!videoMeta) {
+      setVideoMeta(targetMeta);
+    }
+    
+    executeContinuousPipeline(targetMeta);
   };
 
   // Direct downstream extractor metadata fetcher
@@ -447,7 +585,11 @@ export default function App() {
         setSelectedFormat(data.formats[0]);
       }
       showToast(lang === "ar" ? "تم استخراج وتحليل الفيديو بدقة متناهية!" : "Video parsed and indexed accurately!");
-      triggerSummary(data);
+      if (autopilotMode) {
+        executeContinuousPipeline(data);
+      } else {
+        triggerSummary(data);
+      }
     } catch (err: any) {
       setErrorMsg(err.message || "فشل تحليل الرابط");
     } finally {
@@ -849,7 +991,9 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#06080e] text-[#eef2f7] font-sans overflow-x-hidden selection:bg-cyan-500 selection:text-black">
+    <div className="min-h-screen bg-[#06080e] text-[#eef2f7] font-sans overflow-x-hidden selection:bg-cyan-500 selection:text-black cyber-grid-container relative">
+      {/* 3D Moving Cyber Grid background pattern */}
+      <div className="cyber-grid-overlay pointer-events-none" />
       
       {/* TOAST BOX */}
       <AnimatePresence>
@@ -894,157 +1038,235 @@ export default function App() {
       {/* MAIN LAYOUT WRAPPER GRID */}
       <div className="grid grid-cols-1 lg:grid-cols-12 min-h-screen">
         
-        {/* SIDEBAR COMPONENT (COPIED AND STYLED TO EXCEL IN ACCENTS AND TYPOGRAPHY) */}
-        <aside className="lg:col-span-2.5 bg-gradient-to-b from-[#0a1a3a] to-[#04060c] border-r border-white/10 p-5 flex flex-col gap-6">
-          <div className="flex items-center gap-3 pb-5 border-b border-white/10">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-400 via-emerald-400 to-amber-400 p-[2px] shadow-lg shadow-cyan-500/10">
-              <div className="w-full h-full bg-[#0d0f19] rounded-[10px] flex items-center justify-center font-black text-transparent bg-clip-text bg-gradient-to-br from-cyan-400 to-emerald-400 text-lg">
+        {/* 3D HOLOGRAM SIDEBAR COMPONENT */}
+        <aside className="lg:col-span-3 bg-gradient-to-b from-[#0e1628] via-[#070b14] to-[#03060a] border-r border-[#22d3ee]/10 p-5 flex flex-col gap-6 relative">
+          
+          {/* Neon vertical laser glow line */}
+          <div className="absolute top-0 right-0 w-[1px] h-full bg-gradient-to-b from-cyan-400/20 via-emerald-400/20 to-transparent pointer-events-none" />
+          
+          <div className="flex items-center gap-3 pb-5 border-b border-white/5 relative">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-400 via-emerald-400 to-amber-300 p-[1.5px] shadow-[0_0_15px_rgba(34,211,238,0.25)]">
+              <div className="w-full h-full bg-[#0a0f1d] rounded-[10px] flex items-center justify-center font-black text-transparent bg-clip-text bg-gradient-to-br from-cyan-400 to-emerald-400 text-lg">
                 AS
               </div>
             </div>
             <div>
-              <h1 className="text-sm font-black tracking-tight leading-none text-white">
+              <h1 className="text-sm font-black tracking-tight leading-none text-white select-none flex items-center gap-1">
                 WC26 <span className="text-cyan-400 font-extrabold">EMPIRE</span>
               </h1>
-              <p className="text-[9px] text-gray-400 uppercase tracking-widest font-mono mt-1">
-                AI COMMAND CENTER
+              <p className="text-[9px] text-cyan-400/80 uppercase tracking-widest font-mono mt-1">
+                3D Hologram Deck v4.5
               </p>
             </div>
           </div>
 
+          {/* HUB SELECTOR TAB CODES (عمل صفحات لتقسيم المواقع) */}
+          <div className="space-y-2">
+            <p className="text-[9px] uppercase font-bold text-gray-500 tracking-wider px-1 font-mono">
+              {lang === "ar" ? "📡 تقسيم قطاعات المنصة" : "📡 PLATFORM SECTORS"}
+            </p>
+            <div className="grid grid-cols-2 gap-1.5 p-1 bg-[#090d16] rounded-xl border border-white/5">
+              <button
+                onClick={() => setActiveHub("all")}
+                className={`py-1.5 px-2 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
+                  activeHub === "all" 
+                    ? "bg-cyan-500/10 text-cyan-400 border border-cyan-400/20 shadow-sm" 
+                    : "text-gray-400 hover:text-white hover:bg-white/5"
+                }`}
+              >
+                {lang === "ar" ? "🌌 الكل" : "🌌 All"}
+              </button>
+              <button
+                onClick={() => setActiveHub("harvesting")}
+                className={`py-1.5 px-2 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
+                  activeHub === "harvesting" 
+                    ? "bg-cyan-500/10 text-cyan-400 border border-cyan-400/20 shadow-sm" 
+                    : "text-gray-400 hover:text-white hover:bg-white/5"
+                }`}
+              >
+                {lang === "ar" ? "📡 الاستيراد" : "📡 Harvesting"}
+              </button>
+              <button
+                onClick={() => setActiveHub("editor")}
+                className={`py-1.5 px-2 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
+                  activeHub === "editor" 
+                    ? "bg-emerald-500/10 text-emerald-400 border border-emerald-400/20 shadow-sm" 
+                    : "text-gray-400 hover:text-white hover:bg-white/5"
+                }`}
+              >
+                {lang === "ar" ? "🎬 المونتاج" : "🎬 Editor Lab"}
+              </button>
+              <button
+                onClick={() => setActiveHub("publishing")}
+                className={`py-1.5 px-2 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
+                  activeHub === "publishing" 
+                    ? "bg-amber-500/10 text-amber-400 border border-amber-400/20 shadow-sm" 
+                    : "text-gray-400 hover:text-white hover:bg-white/5"
+                }`}
+              >
+                {lang === "ar" ? "📈 النشر" : "📈 Publishing"}
+              </button>
+            </div>
+          </div>
+
           {/* VIEW NAVIGATION LIST */}
-          <nav className="flex flex-col gap-1.5 flex-1" dir={lang === "ar" ? "rtl" : "ltr"}>
-            <p className="text-[10px] uppercase font-bold text-gray-500 px-3 tracking-widest mb-1 font-mono">
-              {lang === "ar" ? "أدوات التنزيل والقنوات" : "Tools & Platforms"}
-            </p>
+          <nav className="flex flex-col gap-1.5 flex-1 select-none overflow-y-auto pr-1" dir={lang === "ar" ? "rtl" : "ltr"}>
             
-            <button
-              onClick={() => setActiveView("downloader")}
-              className={`w-full text-xs font-bold px-3.5 py-3 rounded-xl flex items-center gap-3 transition-all cursor-pointer ${
-                activeView === "downloader" ? "bg-cyan-500/10 text-cyan-400 border border-cyan-400/20 shadow-md" : "text-gray-400 hover:text-white"
-              }`}
-            >
-              <Download className="w-4 h-4" />
-              <span>{lang === "ar" ? "📥 مستخرج الفيديوهات" : "📥 Downloader"}</span>
-            </button>
+            {/* SECTOR 1: HARVESTING HUB */}
+            {(activeHub === "all" || activeHub === "harvesting") && (
+              <div className="space-y-1 mt-2">
+                <div className="flex items-center justify-between px-2 mb-1">
+                  <span className="text-[9px] uppercase font-bold text-cyan-400/80 tracking-wider font-mono">
+                    {lang === "ar" ? "📡 قطاع الاستيراد والأتمتة" : "📡 Harvesting"}
+                  </span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping" style={{ animationDuration: "3s" }} />
+                </div>
+                
+                <button
+                  onClick={() => setActiveView("downloader")}
+                  className={`w-full text-xs font-bold px-3.5 py-3 rounded-xl flex items-center gap-3 transition-all cursor-pointer ${
+                    activeView === "downloader" ? "bg-cyan-500/10 text-cyan-400 border border-cyan-400/20 shadow-md shadow-cyan-500/5 font-extrabold" : "text-gray-400 hover:text-white hover:bg-white/5"
+                  }`}
+                >
+                  <Download className="w-4 h-4 text-cyan-400" />
+                  <span>{lang === "ar" ? "📥 مستخرج الفيديوهات" : "📥 Downloader"}</span>
+                </button>
 
-            <button
-              onClick={() => setActiveView("automation")}
-              className={`w-full text-xs font-bold px-3.5 py-3 rounded-xl flex items-center gap-3 transition-all cursor-pointer ${
-                activeView === "automation" ? "bg-cyan-500/10 text-cyan-400 border border-cyan-400/20 shadow-md animate-pulse" : "text-gray-400 hover:text-white"
-              }`}
-            >
-              <Cpu className="w-4 h-4 text-cyan-400" />
-              <span>{lang === "ar" ? "🤖 جدولة الكشط الذكي (Firecrawl)" : "🤖 Smart Scraper Scheduler"}</span>
-            </button>
+                <button
+                  onClick={() => setActiveView("automation")}
+                  className={`w-full text-xs font-bold px-3.5 py-3 rounded-xl flex items-center gap-3 transition-all cursor-pointer ${
+                    activeView === "automation" ? "bg-cyan-500/10 text-cyan-400 border border-cyan-400/20 shadow-md shadow-cyan-500/5 font-extrabold animate-pulse" : "text-gray-400 hover:text-white hover:bg-white/5"
+                  }`}
+                >
+                  <Cpu className="w-4 h-4 text-cyan-400" />
+                  <span>{lang === "ar" ? "🤖 جدولة الكشط الذكي (Firecrawl)" : "🤖 Smart Scraper"}</span>
+                </button>
 
-            <button
-              onClick={() => setActiveView("dashboard")}
-              className={`w-full text-xs font-bold px-3.5 py-3 rounded-xl flex items-center gap-3 transition-all cursor-pointer ${
-                activeView === "dashboard" ? "bg-cyan-500/10 text-cyan-400 border border-cyan-400/20 shadow-md" : "text-gray-400 hover:text-white"
-              }`}
-            >
-              <BarChart3 className="w-4 h-4" />
-              <span>{lang === "ar" ? "📊 لوحة التحكم والعمليات" : "📊 Dashboard"}</span>
-            </button>
+                <button
+                  onClick={() => setActiveView("watcher")}
+                  className={`w-full text-xs font-bold px-3.5 py-3 rounded-xl flex items-center gap-3 transition-all cursor-pointer ${
+                    activeView === "watcher" ? "bg-cyan-500/10 text-cyan-400 border border-cyan-400/20 shadow-md shadow-cyan-500/5 font-extrabold" : "text-gray-400 hover:text-white hover:bg-white/5"
+                  }`}
+                >
+                  <Eye className="w-4 h-4 text-cyan-400" />
+                  <span>{lang === "ar" ? "🕵️ المراقب الذكي (Watcher)" : "🕵️ Watcher (Ideas)"}</span>
+                </button>
+              </div>
+            )}
 
-            <button
-              onClick={() => setActiveView("calendar")}
-              className={`w-full text-xs font-bold px-3.5 py-3 rounded-xl flex items-center gap-3 transition-all cursor-pointer ${
-                activeView === "calendar" ? "bg-cyan-500/10 text-cyan-400 border border-cyan-400/20 shadow-md" : "text-gray-400 hover:text-white"
-              }`}
-            >
-              <Calendar className="w-4 h-4" />
-              <span>{lang === "ar" ? "📅 تقويم المحتوى الذكي" : "📅 Content Calendar"}</span>
-            </button>
+            {/* SECTOR 2: EDITOR FACTORY */}
+            {(activeHub === "all" || activeHub === "editor") && (
+              <div className="space-y-1 mt-4">
+                <div className="flex items-center justify-between px-2 mb-1">
+                  <span className="text-[9px] uppercase font-bold text-emerald-400/80 tracking-wider font-mono">
+                    {lang === "ar" ? "🎬 معمل المونتاج الذكي" : "🎬 Editor Lab"}
+                  </span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" style={{ animationDuration: "4s" }} />
+                </div>
 
-            <p className="text-[10px] uppercase font-bold text-gray-500 px-3 tracking-widest mt-6 mb-1 font-mono">
-              {lang === "ar" ? "وكلاء الذكاء الاصطناعي" : "Autonomous AI Agents"}
-            </p>
+                <button
+                  onClick={() => setActiveView("copywriter")}
+                  className={`w-full text-xs font-bold px-3.5 py-3 rounded-xl flex items-center gap-3 transition-all cursor-pointer ${
+                    activeView === "copywriter" ? "bg-emerald-500/10 text-emerald-400 border border-emerald-400/20 shadow-md shadow-emerald-500/5 font-extrabold" : "text-gray-400 hover:text-white hover:bg-white/5"
+                  }`}
+                >
+                  <Bot className="w-4 h-4 text-emerald-400" />
+                  <span>{lang === "ar" ? "✍️ كاتب سيناريو الفيديوهات" : "✍️ Scriptwriter"}</span>
+                </button>
 
-            <button
-              onClick={() => setActiveView("watcher")}
-              className={`w-full text-xs font-bold px-3.5 py-3 rounded-xl flex items-center gap-3 transition-all cursor-pointer ${
-                activeView === "watcher" ? "bg-cyan-500/10 text-cyan-400 border border-cyan-400/20 shadow-md" : "text-gray-400 hover:text-white"
-              }`}
-            >
-              <Eye className="w-4 h-4" />
-              <span>{lang === "ar" ? "🕵️ المراقب (Watcher)" : "🕵️ Watcher (Ideas)"}</span>
-            </button>
+                <button
+                  onClick={() => setActiveView("editor")}
+                  className={`w-full text-xs font-bold px-3.5 py-3 rounded-xl flex items-center gap-3 transition-all cursor-pointer ${
+                    activeView === "editor" ? "bg-emerald-500/10 text-emerald-400 border border-emerald-400/20 shadow-md shadow-emerald-500/5 font-extrabold" : "text-gray-400 hover:text-white hover:bg-white/5"
+                  }`}
+                >
+                  <Video className="w-4 h-4 text-emerald-400" />
+                  <span>{lang === "ar" ? "🎞️ صانع لقطات المونتاج" : "🎞️ Shotlist Editor"}</span>
+                </button>
 
-            <button
-              onClick={() => setActiveView("copywriter")}
-              className={`w-full text-xs font-bold px-3.5 py-3 rounded-xl flex items-center gap-3 transition-all cursor-pointer ${
-                activeView === "copywriter" ? "bg-cyan-500/10 text-cyan-400 border border-cyan-400/20 shadow-md" : "text-gray-400 hover:text-white"
-              }`}
-            >
-              <Bot className="w-4 h-4" />
-              <span>{lang === "ar" ? "✍️ كاتب السيناريو" : "✍️ Copywriter Script"}</span>
-            </button>
+                <button
+                  onClick={() => setActiveView("voice")}
+                  className={`w-full text-xs font-bold px-3.5 py-3 rounded-xl flex items-center gap-3 transition-all cursor-pointer ${
+                    activeView === "voice" ? "bg-emerald-500/10 text-emerald-400 border border-emerald-400/20 shadow-md shadow-emerald-500/5 font-extrabold" : "text-gray-400 hover:text-white hover:bg-white/5"
+                  }`}
+                >
+                  <Volume2 className="w-4 h-4 text-emerald-400" />
+                  <span>{lang === "ar" ? "🎙️ معلق الصوت والتعليق" : "🎙️ Voice Over"}</span>
+                </button>
 
-            <button
-              onClick={() => setActiveView("editor")}
-              className={`w-full text-xs font-bold px-3.5 py-3 rounded-xl flex items-center gap-3 transition-all cursor-pointer ${
-                activeView === "editor" ? "bg-cyan-500/10 text-cyan-400 border border-cyan-400/20 shadow-md" : "text-gray-400 hover:text-white"
-              }`}
-            >
-              <Video className="w-4 h-4" />
-              <span>{lang === "ar" ? "🎞️ المحرر المونتاجي" : "🎞️ Editor Shotlist"}</span>
-            </button>
+                <button
+                  onClick={() => setActiveView("shorts")}
+                  className={`w-full text-xs font-bold px-3.5 py-3 rounded-xl flex items-center gap-3 transition-all cursor-pointer ${
+                    activeView === "shorts" ? "bg-emerald-500/10 text-emerald-400 border border-emerald-400/20 shadow-md font-extrabold" : "text-gray-400 hover:text-white hover:bg-white/5"
+                  }`}
+                >
+                  <Zap className="w-4 h-4 text-emerald-400 animate-bounce" />
+                  <span>{lang === "ar" ? "⚡ مصنع مقاطع Shorts" : "⚡ Shorts Factory"}</span>
+                </button>
+              </div>
+            )}
 
-            <button
-              onClick={() => setActiveView("voice")}
-              className={`w-full text-xs font-bold px-3.5 py-3 rounded-xl flex items-center gap-3 transition-all cursor-pointer ${
-                activeView === "voice" ? "bg-cyan-500/10 text-cyan-400 border border-cyan-400/20 shadow-md" : "text-gray-400 hover:text-white"
-              }`}
-            >
-              <Volume2 className="w-4 h-4" />
-              <span>{lang === "ar" ? "🎙️ المواءمة الصوتية" : "🎙️ Voice Commentator"}</span>
-            </button>
+            {/* SECTOR 3: QUANTUM PUBLISHING */}
+            {(activeHub === "all" || activeHub === "publishing") && (
+              <div className="space-y-1 mt-4">
+                <div className="flex items-center justify-between px-2 mb-1">
+                  <span className="text-[9px] uppercase font-bold text-amber-400/80 tracking-wider font-mono">
+                    {lang === "ar" ? "📈 القيادة والنشر التفاعلي" : "📈 Publishing"}
+                  </span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" style={{ animationDuration: "5s" }} />
+                </div>
 
-            <button
-              onClick={() => setActiveView("publisher")}
-              className={`w-full text-xs font-bold px-3.5 py-3 rounded-xl flex items-center gap-3 transition-all cursor-pointer ${
-                activeView === "publisher" ? "bg-cyan-500/10 text-cyan-400 border border-cyan-400/20 shadow-md" : "text-gray-400 hover:text-white"
-              }`}
-            >
-              <ShieldCheck className="w-4 h-4" />
-              <span>{lang === "ar" ? "📤 المروج والسيو SEO" : "📤 SEO & Publisher"}</span>
-            </button>
+                <button
+                  onClick={() => setActiveView("dashboard")}
+                  className={`w-full text-xs font-bold px-3.5 py-3 rounded-xl flex items-center gap-3 transition-all cursor-pointer ${
+                    activeView === "dashboard" ? "bg-amber-500/10 text-amber-400 border border-amber-400/20 shadow-md shadow-amber-500/5 font-extrabold" : "text-gray-400 hover:text-white hover:bg-white/5"
+                  }`}
+                >
+                  <BarChart3 className="w-4 h-4 text-amber-400" />
+                  <span>{lang === "ar" ? "📊 لوحة القيادة والنمو" : "📊 Metrics Board"}</span>
+                </button>
 
-            <button
-              onClick={() => setActiveView("shorts")}
-              className={`w-full text-xs font-bold px-3.5 py-3 rounded-xl flex items-center gap-3 transition-all cursor-pointer ${
-                activeView === "shorts" ? "bg-cyan-500/10 text-cyan-400 border border-cyan-400/20 shadow-md" : "text-gray-400 hover:text-white"
-              }`}
-            >
-              <Zap className="w-4 h-4 animate-bounce" />
-              <span>{lang === "ar" ? "⚡ مصنع مقاطع Shorts" : "⚡ Shorts Factory"}</span>
-            </button>
+                <button
+                  onClick={() => setActiveView("calendar")}
+                  className={`w-full text-xs font-bold px-3.5 py-3 rounded-xl flex items-center gap-3 transition-all cursor-pointer ${
+                    activeView === "calendar" ? "bg-amber-500/10 text-amber-400 border border-amber-400/20 shadow-md font-extrabold" : "text-gray-400 hover:text-white hover:bg-white/5"
+                  }`}
+                >
+                  <Calendar className="w-4 h-4 text-amber-400" />
+                  <span>{lang === "ar" ? "📅 تقويم النشر المؤتمت" : "📅 Content Calendar"}</span>
+                </button>
 
-            <p className="text-[10px] uppercase font-bold text-gray-500 px-3 tracking-widest mt-6 mb-1 font-mono">
-              {lang === "ar" ? "الهوية والإعدادات" : "Identity & Variables"}
-            </p>
+                <button
+                  onClick={() => setActiveView("publisher")}
+                  className={`w-full text-xs font-bold px-3.5 py-3 rounded-xl flex items-center gap-3 transition-all cursor-pointer ${
+                    activeView === "publisher" ? "bg-amber-500/10 text-amber-400 border border-amber-400/20 shadow-md font-extrabold" : "text-gray-400 hover:text-white hover:bg-white/5"
+                  }`}
+                >
+                  <ShieldCheck className="w-4 h-4 text-amber-400" />
+                  <span>{lang === "ar" ? "📤 جهات النشر وسيو SEO" : "📤 SEO & Publish"}</span>
+                </button>
 
-            <button
-              onClick={() => setActiveView("brand")}
-              className={`w-full text-xs font-bold px-3.5 py-3 rounded-xl flex items-center gap-3 transition-all cursor-pointer ${
-                activeView === "brand" ? "bg-cyan-500/10 text-cyan-400 border border-cyan-400/20 shadow-md" : "text-gray-400 hover:text-white"
-              }`}
-            >
-              <Palette className="w-4 h-4" />
-              <span>{lang === "ar" ? "🎨 قوالب هوية القناة" : "🎨 Channel Brand Kit"}</span>
-            </button>
+                <button
+                  onClick={() => setActiveView("brand")}
+                  className={`w-full text-xs font-bold px-3.5 py-3 rounded-xl flex items-center gap-3 transition-all cursor-pointer ${
+                    activeView === "brand" ? "bg-amber-500/10 text-amber-400 border border-amber-400/20 shadow-md font-extrabold" : "text-gray-400 hover:text-white hover:bg-white/5"
+                  }`}
+                >
+                  <Palette className="w-4 h-4 text-amber-400" />
+                  <span>{lang === "ar" ? "🎨 قوالب هوية وبراند القناة" : "🎨 Channel Brand"}</span>
+                </button>
 
-            <button
-              onClick={() => setActiveView("settings")}
-              className={`w-full text-xs font-bold px-3.5 py-3 rounded-xl flex items-center gap-3 transition-all cursor-pointer ${
-                activeView === "settings" ? "bg-cyan-500/10 text-cyan-400 border border-cyan-400/20 shadow-md" : "text-gray-400 hover:text-white"
-              }`}
-            >
-              <Settings className="w-4 h-4" />
-              <span>{lang === "ar" ? "⚙️ مفاتيح الربط والإدارة" : "⚙️ System Settings"}</span>
-            </button>
+                <button
+                  onClick={() => setActiveView("settings")}
+                  className={`w-full text-xs font-bold px-3.5 py-3 rounded-xl flex items-center gap-3 transition-all cursor-pointer ${
+                    activeView === "settings" ? "bg-amber-500/10 text-amber-400 border border-amber-400/20 shadow-md font-extrabold" : "text-gray-400 hover:text-white hover:bg-white/5"
+                  }`}
+                >
+                  <Settings className="w-4 h-4 text-amber-400" />
+                  <span>{lang === "ar" ? "⚙️ الإعدادات العامة للمفاتيح" : "⚙️ System Settings"}</span>
+                </button>
+              </div>
+            )}
 
           </nav>
 
@@ -1062,7 +1284,7 @@ export default function App() {
         </aside>
 
         {/* WORKSPACE AREA */}
-        <div className="lg:col-span-9.5 p-6 sm:p-8 flex flex-col justify-between">
+        <div className="lg:col-span-9 p-6 sm:p-8 flex flex-col justify-between">
           
           {/* HEADER TOP BAR CONTAINER */}
           <div className="flex flex-col sm:flex-row justify-between items-center gap-4 pb-6 border-b border-white/10 mb-8">
@@ -1090,6 +1312,158 @@ export default function App() {
               >
                 ⚡ {lang === "ar" ? "تشغيل التدفق المؤتمت" : "Trigger Autonomous Run"}
               </button>
+            </div>
+          </div>
+
+          {/* PERSISTENT MASTER AUTOMATION PIPELINE MONITOR */}
+          <div className="bg-[#0b0f1d]/90 backdrop-blur-md rounded-2xl border border-white/10 p-5 mb-8 overflow-hidden relative shadow-[0_4px_30px_rgba(0,0,0,0.5)]">
+            {/* Cyan/emerald gradient neon bar tracker */}
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-cyan-400 via-emerald-400 to-amber-400 opacity-85" />
+            
+            <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/5 pb-4 mb-4">
+              <div className="flex items-center gap-3">
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center border transition-all ${automationStep >= 0 ? "bg-cyan-500/10 border-cyan-400/30 text-cyan-400 animate-pulse" : "bg-white/5 border-white/10 text-gray-400"}`}>
+                  <Cpu className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-white flex items-center gap-2">
+                    {lang === "ar" ? "🤖 ممر الملاحة والتحليل الكلي المؤتمت" : "🤖 Master Autonomous Ingestion Pipeline"}
+                    {automationStep >= 0 && (
+                      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] bg-cyan-400/15 border border-cyan-400/30 text-cyan-300 uppercase font-mono animate-pulse">
+                        <span className="w-1.5 h-1.5 bg-cyan-400 rounded-full animate-ping" />
+                        Active Running
+                      </span>
+                    )}
+                  </h3>
+                  <p className="text-[11px] text-gray-400 mt-0.5">
+                    {lang === "ar" ? "يعمل الكود بنظام السحب الفوري والتحكم الفائق بدون تدخل بشري لمزامنة البيانات بين الصفحات" : "Zero-human-touch flow connecting downloader, scriptwriter, editor and calendar."}
+                  </p>
+                </div>
+              </div>
+
+              {/* Autopilot Master Switch toggle */}
+              <div className="flex items-center gap-3 bg-[#05070d] border border-white/5 rounded-xl px-4 py-2 self-start md:self-auto">
+                <span className="text-[10px] uppercase font-bold text-gray-400 font-mono">
+                  {lang === "ar" ? "الطيار الآلي" : "AUTOPILOT"}
+                </span>
+                <button 
+                  onClick={() => setAutopilotMode(!autopilotMode)}
+                  className={`relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out outline-none ${autopilotMode ? "bg-cyan-400" : "bg-white/10"}`}
+                >
+                  <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-[#05070d] shadow ring-0 transition duration-200 ease-in-out ${autopilotMode ? (lang === "ar" ? "-translate-x-5" : "translate-x-5") : "translate-x-0"}`} />
+                </button>
+                <span className={`text-[10px] font-black font-mono transition-colors ${autopilotMode ? "text-cyan-400" : "text-gray-500"}`}>
+                  {autopilotMode ? (lang === "ar" ? "نشط" : "ACTIVE") : (lang === "ar" ? "يدوي" : "OFF (MANUAL)")}
+                </span>
+              </div>
+            </div>
+
+            {/* Active Ingested Video Information if available */}
+            {videoMeta && (
+              <div className="mb-4 bg-[#05070d]/60 border border-white/5 rounded-xl p-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <img src={videoMeta.thumbnail} className="w-12 h-8 rounded-lg object-cover border border-white/10" alt="" referrerPolicy="no-referrer" />
+                  <div className="min-w-0">
+                    <span className="text-[9px] uppercase tracking-wider text-gray-500 block font-mono">Active Target Content</span>
+                    <span className="font-extrabold text-white truncate block max-w-sm sm:max-w-md">{videoMeta.title}</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="text-[10px] font-mono text-gray-400 bg-white/5 px-2 py-0.5 rounded font-bold uppercase">{videoMeta.platform}</span>
+                  <span className="text-[10px] font-mono text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded font-bold">{videoMeta.duration}</span>
+                </div>
+              </div>
+            )}
+
+            {/* 3D Connecting Node Map */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2.5 py-2">
+              {[
+                { id: 0, label: "Ingest", labelAr: "استيراد الميديا", view: "downloader", icon: Download, color: "cyan" },
+                { id: 1, label: "Summary", labelAr: "الملخص التكتيكي", view: "dashboard", icon: FileText, color: "cyan" },
+                { id: 2, label: "Script", labelAr: "السيناريو الذكي", view: "copywriter", icon: Sparkles, color: "emerald" },
+                { id: 3, label: "Shotlist", labelAr: "المخطط الحركي", view: "editor", icon: Layers, color: "emerald" },
+                { id: 4, label: "Voice Over", labelAr: "التعليق والتردد", view: "voice", icon: Volume2, color: "emerald" },
+                { id: 5, label: "Clips Slicer", labelAr: "تقطيع شورتس", view: "shorts", icon: Zap, color: "purple" },
+                { id: 6, label: "SEO Tags", labelAr: "وسوم النشر", view: "publisher", icon: BarChart3, color: "amber" },
+                { id: 7, label: "Schedule", labelAr: "تقويم النشر", view: "calendar", icon: Calendar, color: "amber" }
+              ].map((node) => {
+                const isCompleted = automationStep > node.id;
+                const isActive = automationStep === node.id;
+                const IconComp = node.icon;
+                
+                let nodeBg = "bg-white/5 border-white/10 text-gray-400 hover:bg-white/10";
+                let textCol = "text-gray-400";
+                if (isCompleted) {
+                  nodeBg = "bg-emerald-500/10 border-emerald-500/35 text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.05)] hover:bg-emerald-500/20";
+                  textCol = "text-emerald-400 font-extrabold";
+                } else if (isActive) {
+                  nodeBg = "bg-cyan-500/20 border-cyan-400 text-cyan-300 shadow-[0_0_20px_rgba(34,211,238,0.15)] animate-pulse";
+                  textCol = "text-cyan-400 font-black";
+                }
+                
+                return (
+                  <button
+                    key={node.id}
+                    onClick={() => setActiveView(node.view)}
+                    className={`flex flex-col items-center p-2.5 rounded-xl border text-center transition-all cursor-pointer transform hover:scale-[1.03] outline-none ${nodeBg}`}
+                  >
+                    <div className="relative">
+                      <IconComp className="w-5 h-5 mb-1.5" />
+                      {isCompleted && (
+                        <span className="absolute -top-1 -right-1 flex h-2 w-2 rounded-full bg-emerald-500" />
+                      )}
+                      {isActive && (
+                        <span className="absolute -top-1 -right-1 flex h-2 w-2 rounded-full bg-cyan-400 animate-ping" />
+                      )}
+                    </div>
+                    <span className={`text-[10px] tracking-tight leading-tight block ${textCol}`}>
+                      {lang === "ar" ? node.labelAr : node.label}
+                    </span>
+                    <span className="text-[8px] uppercase tracking-wider text-gray-500 mt-1 block font-mono">
+                      {isCompleted ? "DONE" : isActive ? "RUNNING" : "QUEUED"}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Realtime Terminal Stream Output */}
+            <div className="mt-4 bg-[#04060b] rounded-xl border border-white/5 p-3 font-mono text-xs overflow-hidden">
+              <div className="flex items-center justify-between border-b border-white/5 pb-2 mb-2">
+                <div className="flex items-center gap-1.5 text-[10px] text-gray-500 uppercase tracking-wider">
+                  <span className="w-2 h-2 rounded-full bg-red-500/60" />
+                  <span className="w-2 h-2 rounded-full bg-yellow-500/60" />
+                  <span className="w-2 h-2 rounded-full bg-green-500/60" />
+                  <span className="ml-1">SYSTEM TERMINAL STREAM</span>
+                </div>
+                {automationStep >= 0 && (
+                  <span className="text-[10px] text-cyan-400 font-extrabold animate-pulse">
+                    {((automationStep + 1) * 12.5).toFixed(0)}% PROCESSED
+                  </span>
+                )}
+              </div>
+              
+              <div className="space-y-1 max-h-[85px] overflow-y-auto custom-scrollbar text-[11px]">
+                {autopilotLog.length === 0 ? (
+                  <div className="text-gray-550 italic">
+                    &gt; [AuraStream System Core] Ready for ingestion. Drop any URL or launch autonomous flow above.
+                  </div>
+                ) : (
+                  autopilotLog.map((log, index) => (
+                    <div key={index} className="flex items-start gap-1.5 text-emerald-400">
+                      <span className="text-gray-500 shrink-0">&gt;</span>
+                      <span className="leading-relaxed">{log}</span>
+                    </div>
+                  ))
+                )}
+                {automationStep >= 0 && automationStep < 8 && (
+                  <div className="flex items-center gap-1 text-cyan-300 animate-pulse">
+                    <span className="text-gray-500 shrink-0">&gt;</span>
+                    <span className="w-1.5 h-3 bg-cyan-400 inline-block animate-pulse align-middle" />
+                    <span>{lang === "ar" ? "جاري القيام بالحوسبة ومزامنة البيانات في الأقسام..." : "Compiling metadata tensors and generating AI artifacts..."}</span>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
@@ -1396,18 +1770,69 @@ export default function App() {
                             <span>{videoMeta.platform}</span>
                           </span>
                         </div>
-                        <div className="p-4">
-                          <h4 className="font-bold text-xs text-white leading-relaxed line-clamp-2">{videoMeta.title}</h4>
-                          <p className="text-[10px] text-gray-400 mt-2 font-mono">By: {videoMeta.author}</p>
+                        <div className="p-4 space-y-4">
+                          <div>
+                            <h4 className="font-bold text-xs text-white leading-relaxed line-clamp-2">{videoMeta.title}</h4>
+                            <p className="text-[10px] text-gray-400 mt-1.5 font-mono">By: {videoMeta.author}</p>
+                          </div>
                           
-                          <div className="grid grid-cols-2 gap-3 mt-4 text-center">
-                            <div className="bg-white/5 rounded-lg p-2.5">
+                          <div className="grid grid-cols-2 gap-3 text-center">
+                            <div className="bg-white/5 rounded-lg p-2.5 border border-white/5">
                               <p className="text-[9px] text-gray-400">EST. VIEWS</p>
                               <p className="text-xs font-extrabold text-white mt-1">{videoMeta.views}</p>
                             </div>
-                            <div className="bg-white/5 rounded-lg p-2.5">
+                            <div className="bg-white/5 rounded-lg p-2.5 border border-white/5">
                               <p className="text-[9px] text-gray-400">ENGAGEMENT</p>
                               <p className="text-xs font-extrabold text-cyan-400 mt-1">{videoMeta.likes}</p>
+                            </div>
+                          </div>
+
+                          {/* AI 3D DECK SECTOR CLASSIFICATION */}
+                          <div className="bg-[#11192e] rounded-xl p-3.5 border border-cyan-400/10 space-y-2.5">
+                            <div className="flex items-center gap-2">
+                              <Bot className="w-3.5 h-3.5 text-cyan-400" />
+                              <span className="text-[10px] uppercase font-bold text-cyan-400 font-mono tracking-wider">
+                                {lang === "ar" ? "تحليل الذكاء الاصطناعي ثلاثي الأبعاد" : "3D AI Stream Intel"}
+                              </span>
+                            </div>
+
+                            <div className="space-y-2 text-xs">
+                              <div className="flex items-center justify-between border-b border-white/5 pb-1.5">
+                                <span className="text-gray-450 text-[10px]">{lang === "ar" ? "التصنيف التكتيكي:" : "Tactical Slot:"}</span>
+                                <span className="text-emerald-400 font-bold bg-emerald-400/10 px-2 py-0.5 rounded-full text-[10px] uppercase border border-emerald-400/20">
+                                  {videoMeta.category || (lang === "ar" ? "عام / رياضة" : "General / Sport")}
+                                </span>
+                              </div>
+
+                              <div className="space-y-1.5">
+                                <p className="text-gray-450 text-[10px]">{lang === "ar" ? "مسار المونتاج والإنتاج الموصى به:" : "Recommended Automation Route:"}</p>
+                                <div className="p-2 bg-[#0c101d] rounded-lg border border-white/5 text-[10px] text-cyan-300 font-mono flex items-center gap-1.5">
+                                  <Cpu className="w-3 h-3 text-cyan-300" />
+                                  <span>{videoMeta.suggested_pipeline || (lang === "ar" ? "أتمتة كتابة السيناريو وصناعة المقاطع القصيرة" : "Automatic script copywriting & clip slicing")}</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* CROSS ROUTE HOTKEYS (أزرار للممرات السريعة بين الصفحات) */}
+                            <div className="pt-2 grid grid-cols-2 gap-1.5">
+                              <button
+                                onClick={() => {
+                                  // Switch to scriptwriter view and keep context
+                                  setActiveView("copywriter");
+                                }}
+                                className="py-1.5 px-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 rounded-lg text-[9px] font-bold text-center transition-all cursor-pointer"
+                              >
+                                {lang === "ar" ? "✍️ إرسال للسيناريو" : "✍️ Send to Script"}
+                              </button>
+                              <button
+                                onClick={() => {
+                                  // Switch to shorts view
+                                  setActiveView("shorts");
+                                }}
+                                className="py-1.5 px-2 bg-pink-500/10 hover:bg-pink-500/20 text-pink-400 border border-pink-500/20 rounded-lg text-[9px] font-bold text-center transition-all cursor-pointer"
+                              >
+                                {lang === "ar" ? "⚡ مصنع Shorts" : "⚡ Shorts Lab"}
+                              </button>
                             </div>
                           </div>
                         </div>
